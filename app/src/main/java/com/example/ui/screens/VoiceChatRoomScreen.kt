@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -87,6 +88,7 @@ fun VoiceChatRoomScreen(
     onRawModeToggled: (Boolean) -> Unit,
     onLeaveRoom: () -> Unit,
     onOpenArchitecture: () -> Unit,
+    onOpenDiagnostics: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isSpeaking = !isMuted && audioStats.currentRms > 0.03f
@@ -159,11 +161,20 @@ fun VoiceChatRoomScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onOpenDiagnostics) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = "Diagnostics Inspector",
+                        tint = TgCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
                 IconButton(onClick = onOpenArchitecture) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "Architecture",
-                        tint = TgCyan,
+                        tint = TgTextMuted,
                         modifier = Modifier.size(20.dp)
                     )
                 }

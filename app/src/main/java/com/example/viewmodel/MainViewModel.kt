@@ -9,6 +9,8 @@ import com.example.data.model.AuthState
 import com.example.data.model.GroupVoiceChat
 import com.example.data.model.VoiceParticipant
 import com.example.data.telegram.TelegramClientBridge
+import com.example.service.VoiceChatForegroundService
+import com.example.telegram.tgcalls.TgCallsStats
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +23,7 @@ enum class MicInteractionType {
     PUSH_TO_TALK
 }
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
+class MainViewModel(private val application: Application) : AndroidViewModel(application) {
 
     val telegramBridge = TelegramClientBridge(application, viewModelScope)
     val audioEngine = AudioEngine(application)
@@ -31,6 +33,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val currentJoinedCall: StateFlow<GroupVoiceChat?> = telegramBridge.currentJoinedCall
     val participants: StateFlow<List<VoiceParticipant>> = telegramBridge.participants
     val protocolLogs: StateFlow<List<String>> = telegramBridge.logsFlow
+    val tgCallsStats: StateFlow<TgCallsStats> = telegramBridge.groupCallEngine.stats
 
     val audioStats: StateFlow<AudioStats> = audioEngine.audioStats
     val waveformFlow: StateFlow<List<Float>> = audioEngine.waveformFlow
@@ -63,14 +66,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showArchitectureDialog = MutableStateFlow(false)
     val showArchitectureDialog: StateFlow<Boolean> = _showArchitectureDialog.asStateFlow()
 
+    // Real Audio Diagnostics screen visibility state
+    private val _showDiagnosticScreen = MutableStateFlow(false)
+    val showDiagnosticScreen: StateFlow<Boolean> = _showDiagnosticScreen.asStateFlow()
+
     init {
         audioEngine.setMuted(true)
         audioEngine.setRawMode(true)
         audioEngine.setMicGain(1.0f)
+        telegramBridge.groupCallEngine.setMuted(true)
+        telegramBridge.groupCallEngine.setManualGain(1.0f)
 
+        // Mandatory Link: Feed low-latency raw 48 kHz PCM frames directly into tgcalls group call media pipeline
         audioEngine.onAudioFrameCaptured = { pcmData, rms, isSpeaking ->
             val muted = audioEngine.isCurrentlyMuted()
             telegramBridge.setSelfSpeaking(isSpeaking = isSpeaking && !muted, isMuted = muted)
+            telegramBridge.groupCallEngine.pushAudioFrame(pcmData, rms, isSpeaking)
         }
     }
 
@@ -93,6 +104,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onLogout() {
         audioEngine.stopCapture()
         telegramBridge.logout()
+        VoiceChatForegroundService.stopService(application)
     }
 
     fun onSearchQueryChanged(query: String) {
@@ -103,19 +115,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         telegramBridge.joinVoiceChat(chat)
         _isMuted.value = true
         audioEngine.setMuted(true)
+        telegramBridge.groupCallEngine.setMuted(true)
         audioEngine.startCapture()
+        VoiceChatForegroundService.startService(application, chat.title)
     }
 
     fun leaveVoiceChat() {
         audioEngine.stopCapture()
         telegramBridge.leaveVoiceChat()
         _isMuted.value = true
+        VoiceChatForegroundService.stopService(application)
     }
 
     fun toggleMute() {
         val newMuted = !_isMuted.value
         _isMuted.value = newMuted
         audioEngine.setMuted(newMuted)
+        telegramBridge.groupCallEngine.setMuted(newMuted)
         telegramBridge.setSelfSpeaking(isSpeaking = false, isMuted = newMuted)
     }
 
@@ -124,6 +140,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val unmuted = pressed
         _isMuted.value = !unmuted
         audioEngine.setMuted(!unmuted)
+        telegramBridge.groupCallEngine.setMuted(!unmuted)
         telegramBridge.setSelfSpeaking(isSpeaking = unmuted, isMuted = !unmuted)
     }
 
@@ -132,12 +149,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (type == MicInteractionType.PUSH_TO_TALK) {
             _isMuted.value = true
             audioEngine.setMuted(true)
+            telegramBridge.groupCallEngine.setMuted(true)
         }
     }
 
     fun setManualGain(gain: Float) {
         _manualGain.value = gain
         audioEngine.setMicGain(gain)
+        telegramBridge.groupCallEngine.setManualGain(gain)
     }
 
     fun setRawMode(enabled: Boolean) {
@@ -154,8 +173,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _showArchitectureDialog.value = show
     }
 
+    fun setShowDiagnosticScreen(show: Boolean) {
+        _showDiagnosticScreen.value = show
+    }
+
     override fun onCleared() {
         super.onCleared()
         audioEngine.stopCapture()
+        VoiceChatForegroundService.stopService(application)
     }
 }

@@ -30,6 +30,7 @@ import com.example.data.model.AuthState
 import com.example.ui.components.TechnicalArchitectureDialog
 import com.example.ui.screens.ActiveChatsScreen
 import com.example.ui.screens.AuthScreen
+import com.example.ui.screens.DiagnosticScreen
 import com.example.ui.screens.VoiceChatRoomScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.TgDarkBackground
@@ -89,6 +90,8 @@ fun MainApp(viewModel: MainViewModel) {
     val isRawMode by viewModel.isRawMode.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val showArchitectureDialog by viewModel.showArchitectureDialog.collectAsStateWithLifecycle()
+    val showDiagnosticScreen by viewModel.showDiagnosticScreen.collectAsStateWithLifecycle()
+    val tgCallsStats by viewModel.tgCallsStats.collectAsStateWithLifecycle()
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -103,6 +106,23 @@ fun MainApp(viewModel: MainViewModel) {
                 .background(TgDarkBackground)
         ) {
             when {
+                // Overlay: Real Subsystem Diagnostic Screen
+                showDiagnosticScreen -> {
+                    DiagnosticScreen(
+                        authState = authState,
+                        activeChats = activeChats,
+                        joinedCall = currentJoinedCall,
+                        audioStats = audioStats,
+                        tgCallsStats = tgCallsStats,
+                        onBack = { viewModel.setShowDiagnosticScreen(false) },
+                        onRunQuickDiagnosticCall = {
+                            if (activeChats.isNotEmpty()) {
+                                viewModel.joinVoiceChat(activeChats.first())
+                            }
+                        }
+                    )
+                }
+
                 // Screen 3: Joined in a Group Voice Chat Room
                 currentJoinedCall != null -> {
                     VoiceChatRoomScreen(
@@ -133,7 +153,8 @@ fun MainApp(viewModel: MainViewModel) {
                         onGainChanged = { viewModel.setManualGain(it) },
                         onRawModeToggled = { viewModel.setRawMode(it) },
                         onLeaveRoom = { viewModel.leaveVoiceChat() },
-                        onOpenArchitecture = { viewModel.setShowArchitectureDialog(true) }
+                        onOpenArchitecture = { viewModel.setShowArchitectureDialog(true) },
+                        onOpenDiagnostics = { viewModel.setShowDiagnosticScreen(true) }
                     )
                 }
 
@@ -152,6 +173,7 @@ fun MainApp(viewModel: MainViewModel) {
                         },
                         onRefresh = { viewModel.telegramBridge.fetchActiveVoiceChats() },
                         onOpenArchitecture = { viewModel.setShowArchitectureDialog(true) },
+                        onOpenDiagnostics = { viewModel.setShowDiagnosticScreen(true) },
                         onLogout = { viewModel.onLogout() }
                     )
                 }
@@ -165,6 +187,7 @@ fun MainApp(viewModel: MainViewModel) {
                         onSendPassword = { viewModel.onCloudPasswordSubmitted(it) },
                         onQuickDemoLogin = { viewModel.onQuickDemoLogin() },
                         onOpenArchitecture = { viewModel.setShowArchitectureDialog(true) },
+                        onOpenDiagnostics = { viewModel.setShowDiagnosticScreen(true) },
                         onResetToPhone = { viewModel.telegramBridge.resetToPhoneNumberInput() },
                         apiId = viewModel.telegramBridge.getApiId(),
                         apiHash = viewModel.telegramBridge.getApiHash(),

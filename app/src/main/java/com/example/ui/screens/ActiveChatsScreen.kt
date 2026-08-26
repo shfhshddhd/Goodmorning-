@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -72,6 +73,7 @@ fun ActiveChatsScreen(
     onJoinChat: (GroupVoiceChat) -> Unit,
     onRefresh: () -> Unit,
     onOpenArchitecture: () -> Unit,
+    onOpenDiagnostics: () -> Unit = {},
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -135,13 +137,23 @@ fun ActiveChatsScreen(
 
             Row {
                 IconButton(
+                    onClick = onOpenDiagnostics,
+                    modifier = Modifier.testTag("open_diagnostics_icon")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = "Diagnostics Inspector",
+                        tint = TgCyan
+                    )
+                }
+                IconButton(
                     onClick = onOpenArchitecture,
                     modifier = Modifier.testTag("open_architecture_icon")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "Architecture Specs",
-                        tint = TgCyan
+                        tint = TgTextMuted
                     )
                 }
                 IconButton(

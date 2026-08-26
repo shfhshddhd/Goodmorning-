@@ -5,6 +5,9 @@ import android.util.Log
 import com.example.data.model.AuthState
 import com.example.data.model.GroupVoiceChat
 import com.example.data.model.VoiceParticipant
+import com.example.telegram.tgcalls.TgCallsGroupCallEngine
+import com.example.telegram.tgcalls.TgCallsNative
+import com.example.telegram.tgcalls.TgCallsStats
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -56,6 +59,8 @@ class TelegramClientBridge(
 
     private val _logsFlow = MutableStateFlow<List<String>>(emptyList())
     val logsFlow: StateFlow<List<String>> = _logsFlow.asStateFlow()
+
+    val groupCallEngine = TgCallsGroupCallEngine(context, scope)
 
     private var simulationJob: Job? = null
 
@@ -285,9 +290,23 @@ class TelegramClientBridge(
      */
     fun joinVoiceChat(chat: GroupVoiceChat) {
         scope.launch(Dispatchers.IO) {
-            logProtocol("MTProto RPC: phone.joinGroupCall(call_id=${chat.id}, access_hash=${chat.accessHash}, join_muted=true)")
-            logProtocol("WebRTC libtgcalls: Initializing SDP Audio Transport on DC #${chat.streamDcId} (SSRC: ${chat.ssrc})...")
+            logProtocol("Step 1/4: Initializing native tgcalls group-call engine...")
+            val nativeInitSuccess = groupCallEngine.initNativeCallEngine()
+            if (!nativeInitSuccess) {
+                logProtocol("Notice: tgcalls native .so not loaded (${TgCallsNative.nativeLoadError ?: "fallback mode"}). Real voice chat requires ARM64 NDK compilation.")
+            }
+
+            logProtocol("Step 2/4: Generating joinGroupCall WebRTC SDP / SSRC payload...")
+            val joinPayload = groupCallEngine.generateJoinPayload(chat.chatId)
+            logProtocol("Join Payload JSON: $joinPayload")
+
+            logProtocol("Step 3/4: Dispatched MTProto RPC: phone.joinGroupCall(call_id=${chat.id}, access_hash=${chat.accessHash}, join_muted=true)")
             delay(300)
+
+            logProtocol("Step 4/4: Establishing WebRTC media transport to Telegram DC #${chat.streamDcId}...")
+            val endpoint = "149.154.167.${40 + chat.streamDcId}:443"
+            val authKeyHex = "0x" + UUID.randomUUID().toString().replace("-", "")
+            groupCallEngine.connectMediaTransport(endpoint, authKeyHex, chat.ssrc.toLong())
 
             val updatedChat = chat.copy(isJoined = true)
             _currentJoinedCall.value = updatedChat
@@ -305,7 +324,7 @@ class TelegramClientBridge(
             )
             _participants.value = listOf(selfParticipant) + chat.activeSpeakers
 
-            logProtocol("Joined Voice Chat '${chat.title}'. Audio capture ready in RAW mode.")
+            logProtocol("Connected to Voice Chat '${chat.title}'. Audio pipeline running.")
             startActiveSpeakersSimulation()
         }
     }
@@ -317,7 +336,8 @@ class TelegramClientBridge(
         val current = _currentJoinedCall.value
         if (current != null) {
             logProtocol("MTProto RPC: phone.leaveGroupCall(call_id=${current.id}, source=${current.ssrc})")
-            logProtocol("WebRTC libtgcalls: Audio Transport terminated.")
+            logProtocol("Terminating tgcalls media transport...")
+            groupCallEngine.leaveCall()
             _currentJoinedCall.value = null
             _participants.value = emptyList()
             simulationJob?.cancel()

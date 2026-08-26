@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -77,6 +78,7 @@ fun AuthScreen(
     onSendPassword: (String) -> Unit,
     onQuickDemoLogin: () -> Unit,
     onOpenArchitecture: () -> Unit,
+    onOpenDiagnostics: () -> Unit = {},
     onResetToPhone: () -> Unit = {},
     apiId: Int = 2040,
     apiHash: String = "b18441a1ff607e10a989891a5462e627",
@@ -472,6 +474,22 @@ fun AuthScreen(
                 Icon(Icons.Default.Info, contentDescription = null, tint = TgTextSecondary, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Telegram Protocol Architecture & Limits", color = TgTextSecondary, fontSize = 12.sp)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Real Subsystem Diagnostics Inspector button
+            OutlinedButton(
+                onClick = onOpenDiagnostics,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp)
+                    .testTag("diagnostics_screen_button")
+            ) {
+                Icon(Icons.Default.Speed, contentDescription = null, tint = TgCyan, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Voice Chat Diagnostics & Audio Subsystems", color = TgCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
