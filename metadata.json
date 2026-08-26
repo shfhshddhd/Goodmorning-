@@ -1,0 +1,6 @@
+{
+  "name": "TG Voice",
+  "description": "Dedicated ultra-low-latency Telegram Voice Chat client with raw audio capture and manual mic gain control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
